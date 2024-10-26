@@ -1,61 +1,128 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection.Metadata.Ecma335;
+using System.Threading.Tasks.Sources;
 using ChessChallenge.API;
+using Microsoft.CodeAnalysis.Emit;
 
 
 public class MyBot : IChessBot
 {
+    public int maxDepth =4;
+    public int totalEvals = 0;
+    List<Move> pvMoves = new List<Move>();
+
     public Move Think(Board board, Timer timer)
     {
         Move[] allMoves = OrderMoves(board);
         bool isWhite = board.IsWhiteToMove;
+         
+        PriorityQueue<Move, int> pvBestMoves = new PriorityQueue<Move, int>();
+    
+        pvBestMoves.Clear();
+
+        int sizeOfPVQueue = 0;
 
         float bestScore =0;
         Move bestMove = allMoves[0];
-        foreach(Move move in allMoves){
+
+        int maxPV = 50;
         
+        foreach(Move move in allMoves){
             board.MakeMove(move);
             if(isWhite){
-                float eval = Minimize(4, int.MinValue, int.MaxValue, board);
+                float eval = Minimize(maxDepth, int.MinValue, int.MaxValue, board);
                 board.UndoMove(move);
-                 if(bestScore < eval){
+                if(bestScore < eval){
                     bestScore = eval;
                     bestMove = move;
                 }
+                if(pvBestMoves.TryPeek(out Move result, out int priority)){
+                    if(sizeOfPVQueue < maxPV){
+                        pvBestMoves.Enqueue(move, (int)eval);
+                        sizeOfPVQueue += 1;
+                    }
+                    else if(priority <= eval){
+                        if(pvBestMoves.TryDequeue(out Move result2, out int priority2)){
+                            sizeOfPVQueue -=1;
+                        }
+                        pvBestMoves.Enqueue(move, (int)eval);
+                        sizeOfPVQueue += 1;
+                    }
+                }
+                else{
+                    pvBestMoves.Enqueue(move, (int)eval);
+                }
             }
             else{
-                float eval = Maximize(4, int.MinValue, int.MaxValue, board);
+                float eval = Maximize(maxDepth, int.MinValue, int.MaxValue, board);
                 board.UndoMove(move);
                 if(bestScore > eval){
                     bestScore = eval;
                     bestMove = move;
                 }
+                if(pvBestMoves.TryPeek(out Move result, out int priority)){
+                     if(sizeOfPVQueue < maxPV){
+                        pvBestMoves.Enqueue(move, (int)eval);
+                        sizeOfPVQueue += 1;
+                    }
+                    else if(priority >= eval){
+                        if(pvBestMoves.TryDequeue(out Move result2, out int priority2)){
+                            sizeOfPVQueue -=1;
+                        }
+                        pvBestMoves.Enqueue(move, (int)eval);
+                        sizeOfPVQueue += 1;
+                    }
+                }
+                else{
+                    pvBestMoves.Enqueue(move, (int)eval);
+                }
             }
             
         }
-        Console.WriteLine("");
-        Console.WriteLine(bestScore);
+        pvMoves.Clear();
+        while(pvBestMoves.TryDequeue(out Move result, out int priority)){
+            pvMoves.Add(result);
+            Console.WriteLine(result);
+        }
+        Console.WriteLine(EvaluateBoard(board));
         Console.WriteLine(bestMove);
+        Console.WriteLine(totalEvals);
+        totalEvals = 0;
+        Console.WriteLine("");
         return bestMove;
     } 
     public Move[] OrderMoves(Board board){
-        // int[] pieceValues = [0, 100, 300,300,500, 900, 0];
+        int[] pieceValues = [0, 100, 300,300,500, 900, 0];
         Move[] allMoves = board.GetLegalMoves();
-        // float[] weights = new float[allMoves.Length];
-        // for(int i =0; i <allMoves.Length; i++){
-        //     float moveGuessScore = 0;
-        //     Move m = allMoves[i];
+        float[] weights = new float[allMoves.Length];
+        
 
-        //     if(m.IsPromotion){moveGuessScore+= pieceValues[(int)m.PromotionPieceType];}
-        //     if(m.IsCapture){
-        //         moveGuessScore+= 10*pieceValues[(int)m.CapturePieceType]-pieceValues[(int)m.MovePieceType];
-        //     }
-        //     weights[i] = moveGuessScore;
-        // }
-        // Array.Sort(weights,allMoves);
+        for(int i =0; i <allMoves.Length; i++){
+            float moveGuessScore = 0;
+            Move m = allMoves[i];
+            if(allMoves.Contains(m)){moveGuessScore+=10000;}
+            if(m.IsPromotion){moveGuessScore+= pieceValues[(int)m.PromotionPieceType];}
+            if(m.IsCapture){
+                moveGuessScore+= 10*pieceValues[(int)m.CapturePieceType]-pieceValues[(int)m.MovePieceType];
+            }
+            
+            weights[i] = moveGuessScore;
+        }
+        for (int i = 0; i < allMoves.Length-1; i++) {
+            for (int j = i + 1; j > 0; j--) {
+                int swapIndex = j - 1;
+                if (weights[swapIndex] < weights[j]) {
+                    (allMoves[j], allMoves[swapIndex]) = (allMoves[swapIndex], allMoves[j]);
+                    (weights[j], weights[swapIndex]) = (weights[swapIndex], weights[j]);
+                }
+            }
+        }
         return allMoves;
     }
     public float EvaluateBoard(Board board){
+        totalEvals +=1;
         int[] pieceValues = [0, 100, 300,300,500, 900, 0];
     
         int[] pawnMap= [0,  0,  0,  0,  0,  0,  0,  0,
@@ -118,10 +185,10 @@ public class MyBot : IChessBot
         foreach(PieceList pL in pieceLists){
             for(int i =0; i < pL.Count; i++){
                 if(pL.IsWhitePieceList){
-                    eval += maps[(int)pL.TypeOfPieceInList][pL.GetPiece(i).Square.Index];
+                    eval += maps[(int)pL.TypeOfPieceInList][63-pL.GetPiece(i).Square.Index];
                 }
                 else{
-                    eval -= maps[(int)pL.TypeOfPieceInList][63- pL.GetPiece(i).Square.Index];
+                    eval -= maps[(int)pL.TypeOfPieceInList][pL.GetPiece(i).Square.Index];
                 }
             }
 

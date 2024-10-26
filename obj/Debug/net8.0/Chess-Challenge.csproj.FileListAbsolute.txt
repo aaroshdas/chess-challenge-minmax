@@ -28,3 +28,4 @@ C:\Users\aaros\Downloads\Chess-Challenge-main\Chess-Challenge-main\Chess-Challen
 C:\Users\aaros\Downloads\Chess-Challenge-main\Chess-Challenge-main\Chess-Challenge\obj\Debug\net8.0\Chess-Challenge.pdb
 C:\Users\aaros\Downloads\Chess-Challenge-main\Chess-Challenge-main\Chess-Challenge\obj\Debug\net8.0\Chess-Challenge.genruntimeconfig.cache
 C:\Users\aaros\Downloads\Chess-Challenge-main\Chess-Challenge-main\Chess-Challenge\obj\Debug\net8.0\ref\Chess-Challenge.dll
+C:\Users\aaros\Downloads\Chess-Challenge-main\Chess-Challenge-main\Chess-Challenge\obj\Debug\net8.0\Chess-Challenge.sourcelink.json
